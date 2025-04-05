@@ -81,7 +81,7 @@ void Min6AutoDrivetrain::TurnToHeading(double Heading, double TurnVelocity, doub
         PIDController pid(1.0f, 0.0f, 0.0f);
 
         //Setup Acceration control
-        MotionAccelerator ma(AccertionSteps, 1000, 0, _maxMotorRPM, _minMotorRPM);
+        MotionAccelerator ma(AccertionSteps, 1000, 0, TurnVelocity, _minMotorRPM);
 
         //Calculate Turn amount and direction
         double d1 = abs(Heading - m_BrainInertial.heading(vex::rotationUnits::deg));
@@ -109,8 +109,8 @@ void Min6AutoDrivetrain::TurnToHeading(double Heading, double TurnVelocity, doub
         {
             m_Brain.resetTimer();
             if (_logLevel > LogLevels::None) printf("Turn Clockwise\n");
-            if (_logLevel == LogLevels::Verbose) printf("Requested, Right Actual, Left Actual\n");
-            m_RightDriveMotor.spin(vex::directionType::fwd);
+            if (_logLevel == LogLevels::Verbose) printf("Requested, Right Actual, Left Actual, Heading\n");
+            m_RightDriveMotor.spin(vex::directionType::rev);
             m_LeftDriveMotor.spin(vex::directionType::fwd);
             while (m_BrainInertial.rotation(vex::rotationUnits::deg) < CWTurnAmount)
             {
@@ -123,7 +123,11 @@ void Min6AutoDrivetrain::TurnToHeading(double Heading, double TurnVelocity, doub
                 m_RightDriveMotor.setVelocity((MotorVelocity * -1), vex::velocityUnits::rpm);
                 m_LeftDriveMotor.setVelocity(MotorVelocity, vex::velocityUnits::rpm);   
                 if (_logLevel == LogLevels::Verbose)
-                    printf("%f, %f, %f, top\n", MotorVelocity, abs(m_RightDriveMotor.velocity(vex::velocityUnits::rpm)), abs(m_LeftDriveMotor.velocity(vex::velocityUnits::rpm)));  
+                    printf("%f, %f, %f, %f\n", 
+                        MotorVelocity, 
+                        abs(m_RightDriveMotor.velocity(vex::velocityUnits::rpm)), 
+                        abs(m_LeftDriveMotor.velocity(vex::velocityUnits::rpm)),
+                        m_BrainInertial.heading(vex::rotationUnits::deg));  
                 if (m_Brain.Timer.time(vex::timeUnits::sec) > TimeOut)
                 {
                     if (_logLevel > LogLevels::None) 
@@ -137,11 +141,42 @@ void Min6AutoDrivetrain::TurnToHeading(double Heading, double TurnVelocity, doub
         }
         else
         {
+            m_Brain.resetTimer();
             if (_logLevel > LogLevels::None) printf("Turn Counter Clockwise\n");
+            if (_logLevel == LogLevels::Verbose) printf("Requested, Right Actual, Left Actual, Heading\n");
+            m_RightDriveMotor.spin(vex::directionType::fwd);
+            m_LeftDriveMotor.spin(vex::directionType::rev);
+            while (abs(m_BrainInertial.rotation(vex::rotationUnits::deg)) < CCWTurnAmount)
+            {
+                double MotorVelocity;
+                if (ma.GET_StepCount() < AccertionSteps)
+                    MotorVelocity = ma.GetNextStepRPM();
+                else
+                    MotorVelocity = ((pid.calculateControlSignal(abs(CCWTurnAmount - abs(m_BrainInertial.rotation(vex::rotationUnits::deg))))) / CCWTurnAmount) * TurnVelocity;
+                if (MotorVelocity < _minMotorRPM) MotorVelocity = _minMotorRPM;
+                m_RightDriveMotor.setVelocity(MotorVelocity, vex::velocityUnits::rpm);
+                m_LeftDriveMotor.setVelocity((MotorVelocity * -1), vex::velocityUnits::rpm);   
+                if (_logLevel == LogLevels::Verbose)
+                    printf("%f, %f, %f, %f, %f\n", 
+                        MotorVelocity, 
+                        abs(m_RightDriveMotor.velocity(vex::velocityUnits::rpm)), 
+                        abs(m_LeftDriveMotor.velocity(vex::velocityUnits::rpm)),
+                        m_BrainInertial.heading(vex::rotationUnits::deg),  
+                        m_BrainInertial.rotation(vex::rotationUnits::deg));
+                if (m_Brain.Timer.time(vex::timeUnits::sec) > TimeOut)
+                {
+                    if (_logLevel > LogLevels::None) 
+                        printf("**TIMED OUT**\n");
+                    break;
+                }
+                wait(20, vex::timeUnits::msec);
+            }
+            m_RightDriveMotor.stop();
+            m_LeftDriveMotor.stop();
         }
         if (_logLevel > LogLevels::None) 
         {
-            printf("Final Heading: %fdegress\n", m_BrainInertial.heading(vex::rotationUnits::deg));
+            printf("Final Heading: %f degress\n", m_BrainInertial.heading(vex::rotationUnits::deg));
             printf("Time To Complete: %fs\n", m_Brain.Timer.time(vex::timeUnits::sec));
         }
     }
