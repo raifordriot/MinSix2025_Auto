@@ -175,7 +175,7 @@ void Routine_Two()
 {
     gBrain.Screen.setCursor(3, 1);
     gBrain.Screen.print("Running 2");
-    wait(2.0f, vex::timeUnits::sec);
+    gDrivetrain.TurnToHeading(270.0f, 50.0f, 5.0f, 0.1f);
     gBrain.Screen.setCursor(3, 10);
     gBrain.Screen.clearLine();
 
